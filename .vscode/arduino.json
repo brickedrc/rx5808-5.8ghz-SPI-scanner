@@ -1,0 +1,7 @@
+{
+    "sketch": "src\\5.8ghzfpv_scanner_sketch_oled\\5.8ghzfpv_scanner_sketch_oled.ino",
+    "board": "arduino:avr:uno",
+    "programmer": "arduino:avrisp",
+    "port": "COM4",
+    "output": "../build/5.8ghzfpv_scanner_sketch_oled"
+}

@@ -20,12 +20,9 @@ This file is part of OLED 5.8ghz Scanner project.
 #include <SPI.h>
 #include <Wire.h>
 #include <EEPROM.h>
-#include "U8glib.h"
+#include <SFE_MicroOLED.h> // Include the SFE_MicroOLED library
 #include "rx5808.h"
 #include "const.h"
-
-// devices with all constructor calls is here: http://code.google.com/p/u8glib/wiki/device
-U8GLIB_SSD1306_128X64 u8g(U8G_I2C_OPT_DEV_0 | U8G_I2C_OPT_NO_ACK | U8G_I2C_OPT_FAST); // Fast I2C / TWI
 
 RX5808 rx5808(rssi_pin);
 
@@ -42,27 +39,33 @@ uint8_t curr_screen = 6;
 uint8_t curr_channel = 0;
 uint32_t curr_freq;
 
-//battery monitor
+// battery monitor
 float volt;
 uint16_t VoltDivider = 10.5;
 
 uint32_t last_irq;
 uint8_t changing_freq, changing_mode;
 
-//default values used for calibration
+// default values used for calibration
 uint16_t rssi_min = 1024;
 uint16_t rssi_max = 0;
 
-void irq_select_handle() {
-  if (millis() - last_irq < 500) //debounce
+#define PIN_RESET 9 // Optional - Connect RST on display to pin 9 on Arduino
+MicroOLED oled(PIN_RESET);
+
+void irq_select_handle()
+{
+  if (millis() - last_irq < 500) // debounce
     return;
 
-  if (curr_status == SCANNER_MODE && digitalRead(button_select) == LOW) { //simply switch to the next screen
+  if (curr_status == SCANNER_MODE && digitalRead(button_select) == LOW)
+  { // simply switch to the next screen
     curr_screen = (curr_screen + 1) % 7;
   }
 
-  if (curr_status == RECEIVER_MODE) {
-    if (digitalRead(button_select) == HIGH && millis() - last_irq > 800) //long press to reach the next strong cannel
+  if (curr_status == RECEIVER_MODE)
+  {
+    if (digitalRead(button_select) == HIGH && millis() - last_irq > 800) // long press to reach the next strong cannel
       curr_channel = rx5808.getNext(curr_channel);
     else
       curr_channel = (curr_channel + 1) % CHANNEL_MAX;
@@ -74,92 +77,104 @@ void irq_select_handle() {
   last_irq = millis();
 }
 
-void irq_mode_handle() {
-  if (millis() - last_irq < 500) //debounce
+void irq_mode_handle()
+{
+  if (millis() - last_irq < 500) // debounce
     return;
 
-  if (digitalRead(button_mode) == LOW) {
+  if (digitalRead(button_mode) == LOW)
+  {
     rx5808.abortScan();
     changing_mode = 1;
 
-    if (curr_status == RECEIVER_MODE) {
+    if (curr_status == RECEIVER_MODE)
+    {
       curr_status = SCANNER_MODE;
-    } else {
+    }
+    else
+    {
       curr_status = RECEIVER_MODE;
-      curr_channel = rx5808.getMaxPos(); //next channel is the strongest
+      curr_channel = rx5808.getMaxPos(); // next channel is the strongest
     }
   }
   last_irq = millis();
 }
 
-void setup() {
-  //button init
+void setup()
+{
+  Serial.begin(115200);
+
+  delay(100);
+  Wire.begin();
+  oled.begin(0x3D, Wire);
+
+  // button init
   pinMode(button_select, INPUT);
   digitalWrite(button_select, HIGH);
   pinMode(button_mode, INPUT);
   digitalWrite(button_mode, HIGH);
 
-  //display init
-  // assign default color value
-  if ( u8g.getMode() == U8G_MODE_R3G3B2 ) {
-    u8g.setColorIndex(255);     // white
-  }
-  else if ( u8g.getMode() == U8G_MODE_GRAY2BIT ) {
-    u8g.setColorIndex(3);         // max intensity
-  }
-  else if ( u8g.getMode() == U8G_MODE_BW ) {
-    u8g.setColorIndex(1);         // pixel on
-  }
-  else if ( u8g.getMode() == U8G_MODE_HICOLOR ) {
-    u8g.setHiColorByRGB(255, 255, 255);
-  }
-
-  u8g.setDefaultForegroundColor();
-  splashScr();
+  // display init
+  oled.clear(ALL);  // Clear the display's internal memory
+  oled.display();   // Display what's in the buffer (splashscreen)
+  delay(1000);      // Delay 1000 ms
+  oled.clear(PAGE); // Clear the buffer.
 
   // initialize SPI:
-  pinMode (SSP, OUTPUT);
+  oled.print("Starting RX");
+  oled.display();
+  oled.clear(PAGE); // Clear the buffer.
+  pinMode(SSP, OUTPUT);
   SPI.begin();
   SPI.setBitOrder(LSBFIRST);
   rx5808.init();
 
-  //power on calibration if button pressed
-  while (digitalRead(button_select) == LOW || digitalRead(button_mode) == LOW) {
+  // power on calibration if button pressed
+  while (digitalRead(button_select) == LOW || digitalRead(button_mode) == LOW)
+  {
+    oled.print("Calibrating...");
+    oled.display();
+    oled.clear(PAGE); // Clear the buffer.
     rx5808.calibration();
   }
 
-  //receiver init
+  // receiver init
   curr_channel = rx5808.getMaxPos();
   changing_freq = 1;
   changing_mode = 0;
 
-  //rock&roll
+  // rock&roll
   attachInterrupt(digitalPinToInterrupt(button_select), irq_select_handle, CHANGE);
   attachInterrupt(digitalPinToInterrupt(button_mode), irq_mode_handle, CHANGE);
 }
 
-void loop(void) {
-  battery_measure();
+void loop(void)
+{
+  // battery_measure();
 
-  if (curr_status == SCANNER_MODE) {
+  if (curr_status == SCANNER_MODE)
+  {
     rx5808.scan(1, BIN_H);
   }
 
-  u8g.firstPage();
-  do {
-    if (changing_mode) { //if changing mode "please wait..."
-      wait_draw();
-    } else {
-      if (curr_status == RECEIVER_MODE) {
-        receiver_draw(curr_channel);
-      }
-      if (curr_status == SCANNER_MODE) {
-        scanner_draw(curr_screen);
-      }
+  if (changing_mode)
+  { // if changing mode "please wait..."
+    wait_draw();
+  }
+  else
+  {
+    if (curr_status == RECEIVER_MODE)
+    {
+      receiver_draw(curr_channel);
     }
-  } while ( u8g.nextPage() );
+    if (curr_status == SCANNER_MODE)
+    {
+      scanner_draw(curr_screen);
+    }
+  }
 
-  if (curr_status == RECEIVER_MODE && changing_freq || changing_mode) {
+  if (curr_status == RECEIVER_MODE && changing_freq || changing_mode)
+  {
     changing_freq = changing_mode = 0;
     rx5808.scan(1, BIN_H);
     curr_freq = pgm_read_word_near(channelFreqTable + curr_channel);

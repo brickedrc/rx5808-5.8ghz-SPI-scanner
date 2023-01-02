@@ -18,26 +18,31 @@ This file is part of OLED 5.8ghz Scanner project.
   */
 
 #include "rx5808.h"
-#define RSSI_THRESH (scanVec[getMaxPos()]-5) //strong channels are near to the global max
+#define RSSI_THRESH (scanVec[getMaxPos()] - 5) // strong channels are near to the global max
 
-RX5808::RX5808(uint16_t pin) {
+RX5808::RX5808(uint16_t pin)
+{
   _rssiPin = pin;
   _stop_scan = 0;
 }
 
-uint16_t RX5808::getRssi(uint16_t channel) {
+uint16_t RX5808::getRssi(uint16_t channel)
+{
   return scanVec[channel];
 }
 
-//stop scan
-void RX5808::abortScan(void) {
+// stop scan
+void RX5808::abortScan(void)
+{
   _stop_scan = 1;
 }
-//get next strong rssi channel
-uint16_t RX5808::getNext(uint16_t channel) {
+// get next strong rssi channel
+uint16_t RX5808::getNext(uint16_t channel)
+{
   channel = (channel + 1) % CHANNEL_MAX;
-  for (uint16_t  complete_iter = CHANNEL_MAX - CHANNEL_MIN; complete_iter != 0; complete_iter-- ) {
-    if (scanVec[channel] > RSSI_THRESH) //new over threashold
+  for (uint16_t complete_iter = CHANNEL_MAX - CHANNEL_MIN; complete_iter != 0; complete_iter--)
+  {
+    if (scanVec[channel] > RSSI_THRESH) // new over threashold
       return channel;
     channel = (channel + 1) % CHANNEL_MAX;
   }
@@ -45,68 +50,78 @@ uint16_t RX5808::getNext(uint16_t channel) {
   return channel;
 }
 
-//get the rssi value of a certain channel of a band and map it to 1...norm
-uint16_t RX5808::getVal(uint16_t band, uint16_t channel, uint8_t norm) {
+// get the rssi value of a certain channel of a band and map it to 1...norm
+uint16_t RX5808::getVal(uint16_t band, uint16_t channel, uint8_t norm)
+{
   return map(scanVec[8 * band + channel], 1, 40, 1, norm);
 }
 
-//get the maximum rssi value for a certain band
-uint16_t RX5808::getMaxPosBand(uint8_t band) {
+// get the maximum rssi value for a certain band
+uint16_t RX5808::getMaxPosBand(uint8_t band)
+{
   uint16_t _chan;
   uint16_t maxVal = 0, maxPos = 8 * band;
-  for (_chan = 8 * band; _chan < 8 * band + 8; _chan++) {
-    if (maxVal < scanVec[_chan]) { //new max
+  for (_chan = 8 * band; _chan < 8 * band + 8; _chan++)
+  {
+    if (maxVal < scanVec[_chan])
+    { // new max
       maxPos = _chan;
       maxVal = scanVec[_chan];
-
     }
   }
   return maxPos;
 }
 
-//get the minimum rssi value for a certain band
-uint16_t RX5808::getMinPosBand(uint8_t band) {
+// get the minimum rssi value for a certain band
+uint16_t RX5808::getMinPosBand(uint8_t band)
+{
   uint16_t _chan;
   uint16_t minVal = 1000, minPos = 8 * band;
-  for (_chan = 8 * band; _chan < 8 * band + 8; _chan++) {
-    if (minVal > scanVec[_chan]) { //new max
+  for (_chan = 8 * band; _chan < 8 * band + 8; _chan++)
+  {
+    if (minVal > scanVec[_chan])
+    { // new max
       minPos = _chan;
       minVal = scanVec[_chan];
-
     }
   }
   return minPos;
 }
 
-//get global max
-uint16_t RX5808::getMaxPos() {
+// get global max
+uint16_t RX5808::getMaxPos()
+{
   uint8_t _chan;
   uint16_t maxVal = 0, maxPos = 0;
-  for (_chan = CHANNEL_MIN; _chan < CHANNEL_MAX; _chan++) {
-    if (maxVal < scanVec[_chan]) { //new max
+  for (_chan = CHANNEL_MIN; _chan < CHANNEL_MAX; _chan++)
+  {
+    if (maxVal < scanVec[_chan])
+    { // new max
       maxPos = _chan;
       maxVal = scanVec[_chan];
-
     }
   }
   return maxPos;
 }
 
-//get global min
-uint16_t RX5808::getMinPos() {
+// get global min
+uint16_t RX5808::getMinPos()
+{
   uint8_t _chan;
   uint16_t minVal = 1000, minPos = 0;
-  for (_chan = CHANNEL_MIN; _chan < CHANNEL_MAX; _chan++) {
-    if (minVal > scanVec[_chan]) { //new max
+  for (_chan = CHANNEL_MIN; _chan < CHANNEL_MAX; _chan++)
+  {
+    if (minVal > scanVec[_chan])
+    { // new max
       minPos = _chan;
       minVal = scanVec[_chan];
-
     }
   }
   return minPos;
 }
 
-void RX5808::init() {
+void RX5808::init()
+{
   rssi_min = ((EEPROM.read(EEPROM_ADR_RSSI_MIN_H) << 8) | (EEPROM.read(EEPROM_ADR_RSSI_MIN_L)));
   rssi_max = ((EEPROM.read(EEPROM_ADR_RSSI_MAX_H) << 8) | (EEPROM.read(EEPROM_ADR_RSSI_MAX_L)));
 
@@ -120,8 +135,9 @@ void RX5808::init() {
   rx5808.scan(1, BIN_H);
 }
 
-//set a certain frequency for the RX module
-void RX5808::setFreq(uint32_t freq) {
+// set a certain frequency for the RX module
+void RX5808::setFreq(uint32_t freq)
+{
   uint32_t Delitel = (freq - 479) / 2;
 
   byte DelitelH = Delitel >> 5;
@@ -140,11 +156,14 @@ void RX5808::setFreq(uint32_t freq) {
   digitalWrite(SSP, HIGH);
 }
 
-//do a complete scan and normalize all the values
-void RX5808::scan(uint16_t norm_min, uint16_t norm_max) {
+// do a complete scan and normalize all the values
+void RX5808::scan(uint16_t norm_min, uint16_t norm_max)
+{
 
-  for (uint16_t _chan = CHANNEL_MIN; _chan < CHANNEL_MAX; _chan++) {
-    if (_stop_scan) {
+  for (uint16_t _chan = CHANNEL_MIN; _chan < CHANNEL_MAX; _chan++)
+  {
+    if (_stop_scan)
+    {
       _stop_scan = 0;
       return;
     }
@@ -153,16 +172,18 @@ void RX5808::scan(uint16_t norm_min, uint16_t norm_max) {
     setFreq(freq);
     _wait_rssi();
 
-    uint16_t rssi =  _readRSSI();
+    uint16_t rssi = _readRSSI();
     rssi = constrain(rssi, rssi_min, rssi_max);
-    rssi = map(rssi, rssi_min, rssi_max, norm_min, norm_max);   // scale from 1..100%
+    rssi = map(rssi, rssi_min, rssi_max, norm_min, norm_max); // scale from 1..100%
     scanVec[_chan] = rssi;
   }
 }
 
-//same as scan, but raw values, used for calibration
-void RX5808::_calibrationScan() {
-  for (uint16_t _chan = CHANNEL_MIN; _chan < CHANNEL_MAX; _chan++) {
+// same as scan, but raw values, used for calibration
+void RX5808::_calibrationScan()
+{
+  for (uint16_t _chan = CHANNEL_MIN; _chan < CHANNEL_MAX; _chan++)
+  {
 
     uint32_t freq = pgm_read_word_near(channelFreqTable + _chan);
     setFreq(freq);
@@ -171,14 +192,16 @@ void RX5808::_calibrationScan() {
   }
 }
 
-void RX5808::_wait_rssi() {
+void RX5808::_wait_rssi()
+{
   // 30ms will to do a 32 channels scan in 1 second
 #define MIN_TUNE_TIME 30
   delay(MIN_TUNE_TIME);
 }
 
-uint16_t RX5808::_readRSSI() {
-  uint32_t  sum = 0;
+uint16_t RX5808::_readRSSI()
+{
+  uint32_t sum = 0;
   for (uint8_t i = 0; i < 10; i++)
   {
     sum += analogRead(_rssiPin);
@@ -187,16 +210,19 @@ uint16_t RX5808::_readRSSI() {
   return sum / 10; // average
 }
 
-//compute the min and max RSSI value and store the values in EEPROM
-void RX5808::calibration() {
+// compute the min and max RSSI value and store the values in EEPROM
+void RX5808::calibration()
+{
   int i = 0, j = 0;
-  uint16_t  rssi_setup_min = 1024, minValue = 1024;
-  uint16_t  rssi_setup_max = 0, maxValue = 0;
+  uint16_t rssi_setup_min = 1024, minValue = 1024;
+  uint16_t rssi_setup_max = 0, maxValue = 0;
 
-  for (j = 0; j < 5; j++) {
+  for (j = 0; j < 5; j++)
+  {
     _calibrationScan();
 
-    for (i = CHANNEL_MIN; i < CHANNEL_MAX; i++) {
+    for (i = CHANNEL_MIN; i < CHANNEL_MAX; i++)
+    {
       uint16_t rssi = scanVec[i];
 
       minValue = min(minValue, rssi);
@@ -217,18 +243,19 @@ void RX5808::calibration() {
   rssi_min = ((EEPROM.read(EEPROM_ADR_RSSI_MIN_H) << 8) | (EEPROM.read(EEPROM_ADR_RSSI_MIN_L)));
   rssi_max = ((EEPROM.read(EEPROM_ADR_RSSI_MAX_H) << 8) | (EEPROM.read(EEPROM_ADR_RSSI_MAX_L)));
 
-  //print the min and max value
-  u8g.firstPage();
-  do {
+  // print the min and max value
+  oled.clear(PAGE);
+  sprintf(buf, "MIN: %d", rssi_setup_min);
+  // u8g.drawStr(20, 20, buf);
+  oled.setCursor(20, 20);
+  oled.print(buf);
 
-    sprintf (buf, "MIN: %d", rssi_setup_min);
-    u8g.drawStr(20, 20, buf);
+  sprintf(buf, "MAX: %d", rssi_setup_max);
+  // u8g.drawStr(20, 50, buf);
+  oled.setCursor(20, 50);
+  oled.print(buf);
 
-    sprintf (buf, "MAX: %d", rssi_setup_max);
-    u8g.drawStr(20, 50, buf);
-
-  } while ( u8g.nextPage() );
-
+  oled.display();
   delay(3000);
 
   return;
